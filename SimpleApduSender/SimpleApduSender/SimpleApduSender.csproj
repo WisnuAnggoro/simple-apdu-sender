@@ -48,6 +48,11 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="SCardProtocol.cs" />
+    <Compile Include="SCardReturnValues.cs" />
+    <Compile Include="SCardScopes.cs" />
+    <Compile Include="SCardShareModes.cs" />
+    <Compile Include="SCardWrapper.cs" />
     <Compile Include="WinSCard.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
