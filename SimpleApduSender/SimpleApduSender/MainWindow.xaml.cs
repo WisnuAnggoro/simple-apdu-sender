@@ -116,7 +116,7 @@ namespace SimpleApduSender
                 {
                     continue;
                 }
-                else if (line.Take(5).ToString() == "RST()")
+                else if (line.Substring(0, 5) == "RST()")
                 {
                     retval.Add(
                         new ApduScript(
@@ -151,41 +151,76 @@ namespace SimpleApduSender
 
             foreach (ApduScript script in scriptList)
             {
-                string expOut = scWrapper.SendAPDU(script.Input);
                 bool isContinue = true;
 
-                rtbOutput.AppendText(
-                    String.Format(
-                        ">> {0}{1}",
-                        script.Input,
-                        Environment.NewLine));
-
-                rtbOutput.AppendText(
-                    String.Format(
-                        "<< {0}{1}",
-                        expOut,
-                        Environment.NewLine));
-
-                rtbOutput.Refresh();
-
-                if (expOut == String.Empty)
+                if (script.IsReset)
                 {
-                    isContinue = DisplayErrorMessageYesNo(
+                    string atr;
+                    bool success = scWrapper.ResetReader(
+                        (string)cboReader.SelectedItem,
+                        out atr);
+
+                    rtbOutput.AppendText(
                         String.Format(
-                            "{0}{1}. Do you wish to continue?",
-                            scWrapper.LastErrorString,
+                            ">> RST(){0}",
                             Environment.NewLine));
 
-                    if (!isContinue)
-                        break;
-                }
-                else if(expOut != script.ExpectedOutput)
-                {
-                    isContinue = DisplayErrorMessageYesNo(
-                        "Unexpected result. Do you wish to continue?");
+                    if (!success)
+                    {
+                        isContinue = DisplayErrorMessageYesNo(
+                            "Unable to reset the reader. Do you wish to continue?");
 
-                    if (!isContinue)
-                        break;
+                        if (!isContinue)
+                            break;
+                    }
+
+                    rtbOutput.AppendText(
+                        String.Format(
+                            "<< {0}{1}",
+                            atr,
+                            Environment.NewLine));
+
+                    rtbOutput.ScrollToEnd();
+                    rtbOutput.Refresh();
+                }
+                else
+                {
+                    string expOut = scWrapper.SendAPDU(script.Input);
+
+                    rtbOutput.AppendText(
+                        String.Format(
+                            ">> {0}{1}",
+                            script.Input,
+                            Environment.NewLine));
+
+                    rtbOutput.AppendText(
+                        String.Format(
+                            "<< {0}{1}",
+                            expOut,
+                            Environment.NewLine));
+
+                    rtbOutput.ScrollToEnd();
+                    rtbOutput.Refresh();
+
+                    if (expOut == String.Empty)
+                    {
+                        isContinue = DisplayErrorMessageYesNo(
+                            String.Format(
+                                "{0}{1}. Do you wish to continue?",
+                                scWrapper.LastErrorString,
+                                Environment.NewLine));
+
+                        if (!isContinue)
+                            break;
+                    }
+                    else if (expOut != script.ExpectedOutput)
+                    {
+                        isContinue = DisplayErrorMessageYesNo(
+                            "Unexpected result. Do you wish to continue?");
+
+                        if (!isContinue)
+                            break;
+                    } 
                 }
             }
         }

@@ -142,7 +142,6 @@ namespace SimpleApduSender
                     break;
                 case SCardReturnValues.SCARD_E_PIN_CACHE_EXPIRED:
                     sRet = "The smart card PIN cache has expired.";
-                    break;// Windows Server 2008, Windows Vista, Windows Server 2003, and Windows XP:  This error code is not available.";
                     break;
                 case SCardReturnValues.SCARD_E_PROTO_MISMATCH:
                     sRet = "The requested protocols are incompatible with the protocol currently in use with the card.";
@@ -434,6 +433,56 @@ namespace SimpleApduSender
             return Utility.ByteArrayToStrByteArray(
                 abResp, 
                 (UInt16)wLenRecv);
+        }
+
+        public bool ResetReader(
+            string SelectedReader,
+            out string ATR)
+        {
+            String atr_temp = "";
+            String s = "";
+            bool boRet = true;
+
+            ATR = atr_temp;
+
+            // Disconnect to with reset disposition
+            LastError = WinSCard.SCardDisconnect(
+                _cardHandle,
+                (int)SCardReaderDisposition.Reset);
+
+            if (!IsSuccess(LastError))
+                return false;
+
+            // Connect to selected reader
+            if (!ConnectReader(SelectedReader))
+                return false;
+
+            // Init readerState
+            SCARD_READERSTATE readerState = new SCARD_READERSTATE
+            {
+                RdrName = SelectedReader,
+                RdrCurrState = 0,
+                RdrEventState = 0,
+                UserData = "Card",
+            };
+
+            // Get Status Change
+            LastError = WinSCard.SCardGetStatusChange(
+                _context,
+                0,
+                ref readerState,
+                1);
+
+            if (!IsSuccess(LastError))
+                return false;
+
+            StringBuilder hex = new StringBuilder(readerState.ATRValue.Length * 2);
+            foreach (byte b in readerState.ATRValue)
+                hex.AppendFormat("{0:X2}", b);
+            atr_temp = hex.ToString();
+
+            ATR = atr_temp;
+            return boRet;
         }
     }
 }
