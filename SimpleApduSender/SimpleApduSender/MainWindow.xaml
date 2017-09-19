@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SimpleApduSender"
         mc:Ignorable="d"
-        Title="Simple APDU Sender" Height="600" Width="800" Loaded="Window_Loaded">
+        Title="Simple APDU Sender" Height="600" Width="800" Loaded="Window_Loaded" FontFamily="Tahoma" FontSize="14" WindowStyle="ThreeDBorderWindow" WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -19,16 +19,28 @@
         </Grid.ColumnDefinitions>
         <DockPanel Grid.Row="0">
             <Label Margin="5" Content="Select Reader" DockPanel.Dock="Left" />
-            <Button Margin="5" Width="100" Name="btnRefresh" Content="Refresh Reader" DockPanel.Dock="Right" Click="btnRefresh_Click" />
+            <Button Margin="5" Width="120" Name="btnRefresh" Content="Refresh Reader" DockPanel.Dock="Right" Click="btnRefresh_Click" />
             <ComboBox Margin="5" Name="cboReader" />
         </DockPanel>
         <DockPanel Grid.Row="1">
             <Label Margin="5" Content="Script File" DockPanel.Dock="Left" />
             <Button Margin="5" Width="25" Name="btnScriptBrowse" Content="..." DockPanel.Dock="Right" Click="btnScriptBrowse_Click" />
-            <TextBox Margin="5" Name="txtScriptPath" />
+            <TextBox Margin="5" Name="txtScriptPath" IsReadOnly="True" />
         </DockPanel>
-        <RichTextBox Grid.Row="2" Margin="5" Name="rtbScript" />
-        <Button Grid.Row="3" Margin="5" Height="27" Content="Run Script" Click="Button_Click" />
-        <RichTextBox Grid.Row="4" Margin="5" Name="rtbOutput" />
+        <RichTextBox Grid.Row="2" Margin="5" Name="rtbScript" FontFamily="Consolas" FontSize="14" VerticalScrollBarVisibility="Visible">
+            <RichTextBox.Resources>
+                <Style TargetType="{x:Type Paragraph}">
+                    <Setter Property="Margin" Value="0"/>
+                </Style>
+            </RichTextBox.Resources>
+        </RichTextBox>
+        <Button Grid.Row="3" Margin="5" Height="27" Name="btnRunScript" Content="Run Script" Click="btnRunScript_Click" />
+        <RichTextBox Grid.Row="4" Margin="5" Name="rtbOutput" FontFamily="Consolas" FontSize="14" VerticalScrollBarVisibility="Visible" IsReadOnly="True">
+            <RichTextBox.Resources>
+                <Style TargetType="{x:Type Paragraph}">
+                    <Setter Property="Margin" Value="0"/>
+                </Style>
+            </RichTextBox.Resources>
+        </RichTextBox>
     </Grid>
 </Window>

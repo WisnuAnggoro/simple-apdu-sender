@@ -8,15 +8,24 @@ namespace SimpleApduSender
     public class SCardWrapper
     {
         private IntPtr _context;
+        private IntPtr _cardHandle;
+
         private uint _scope;
+        private uint _shareMode;
+        private uint _protocol;
+        IntPtr activeProtocol = IntPtr.Zero;
 
         public int LastError { get; private set; }
         public string LastErrorString { get; private set; }
 
         public SCardWrapper(
-            SCardScopes scope)
+            SCardScopes scope,
+            SCardShareModes shareMode,
+            SCardProtocol protocol)
         {
             _scope = (uint)scope;
+            _shareMode = (uint)shareMode;
+            _protocol = (uint)protocol;
         }
 
         private bool IsSuccess(int retval)
@@ -346,6 +355,85 @@ namespace SimpleApduSender
             {
                 throw;
             }
+        }
+
+        public bool ConnectReader(string SelectedReader)
+        {
+            try
+            {
+                // Connect to selected reader
+                LastError = WinSCard.SCardConnect(
+                    _context,
+                    SelectedReader,
+                    _shareMode,
+                    _protocol,
+                    ref _cardHandle,
+                    ref activeProtocol);
+
+                if (!IsSuccess(LastError))
+                    return false;
+
+                return true;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public bool DisconnectReader()
+        {
+            try
+            {
+                // Disconnect to selected Card Handle
+                LastError = WinSCard.SCardDisconnect(
+                    _cardHandle,
+                    (int)SCardReaderDisposition.Unpower);
+
+                if (!IsSuccess(LastError))
+                    return false;
+
+                return true;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public string SendAPDU(string sAPDU)
+        {
+            SCARD_IO_REQUEST sendRequest;
+            sendRequest.dwProtocol = (int)activeProtocol;
+            sendRequest.cbPciLength = 8;
+
+            SCARD_IO_REQUEST receiveRequest;
+            receiveRequest.cbPciLength = 8;
+            receiveRequest.dwProtocol = (int)activeProtocol;
+
+            byte[] abAPDU = new byte[300];
+            byte[] abResp = new byte[300];
+            UInt32 wLenSend = 0;
+            Int32 wLenRecv = 260;
+
+            sAPDU = Utility.RemoveNonHexa(sAPDU);
+            wLenSend = Utility.StrByteArrayToByteArray(sAPDU, ref abAPDU);
+
+            LastError = WinSCard.SCardTransmit(
+                _cardHandle, 
+                ref sendRequest, 
+                abAPDU, 
+                (int)wLenSend, 
+                ref receiveRequest, 
+                abResp, 
+                ref wLenRecv);
+
+            if (!IsSuccess(LastError))
+                return String.Empty;
+
+            return Utility.ByteArrayToStrByteArray(
+                abResp, 
+                (UInt16)wLenRecv);
         }
     }
 }
