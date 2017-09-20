@@ -49,20 +49,6 @@ namespace SimpleApduSender
                 MessageBoxImage.Error) == MessageBoxResult.Yes);
         }
 
-        private string StringFromRichTextBox(RichTextBox rtb)
-        {
-            TextRange textRange = new TextRange(
-              // TextPointer to the start of content in the RichTextBox.
-              rtb.Document.ContentStart,
-              // TextPointer to the end of content in the RichTextBox.
-              rtb.Document.ContentEnd
-            );
-
-            // The Text property on a TextRange object returns a string 
-            // representing the plain text content of the TextRange. 
-            return textRange.Text;
-        }
-
         private void RefreshReaderList()
         {
             try
@@ -95,45 +81,102 @@ namespace SimpleApduSender
         {
             List<ApduScript> retval = new List<ApduScript>();
 
-            string[] lines =
-                StringFromRichTextBox(rtbScript)
-                    .Split(
-                        new[] { Environment.NewLine },
-                        StringSplitOptions.RemoveEmptyEntries);
+            string[] lines = txtScript.Text.Split(
+                new string[] { Environment.NewLine }, 
+                StringSplitOptions.None);
 
             string input = String.Empty;
             string output = String.Empty;
+
+            // Last Phrase:
+            // 0x0 (0000) -> Unknown
+            // 0x1 (0001) -> "RST()"
+            // 0x2 (0010) -> "I:"
+            // 0x4 (0100) -> "O:"
+            // 0x8 (1000) -> Comment
+            byte lastPhrase = 0;
 
             foreach (string s in lines)
             {
                 string line = s.Trim();
 
+                // Ignore empty line
                 if (line == String.Empty)
                 {
-                    continue;
-                }
-                else if (line.Take(1).ToString() == "'")
-                {
-                    continue;
-                }
-                else if (line.Substring(0, 5) == "RST()")
-                {
-                    retval.Add(
+                    // If user create apdu command without expected result
+                    if (lastPhrase == 2)
+                    {
+                        retval.Add(
                         new ApduScript(
-                            true));
+                            input,
+                            null));
+                    }
+
+                    lastPhrase = 0;
+                    continue;
                 }
-                else if (line.Substring(0, 2) == "I:")
+                // Ignore comment line
+                else if (line.Substring(0,1) == "'")
                 {
-                    input = line.Substring(2).Trim();
+                    // If user create apdu command without expected result
+                    if (lastPhrase == 2)
+                    {
+                        retval.Add(
+                        new ApduScript(
+                            input,
+                            null));
+                    }
+
+                    lastPhrase = 8;
+                    continue;
                 }
-                else if (line.Substring(0, 2) == "O:")
+                else if (line.Substring(0, 5).ToUpper() == "RST()")
                 {
-                    output = line.Substring(2).Trim();
+                    // If user create apdu command without expected result
+                    if (lastPhrase == 2)
+                    {
+                        retval.Add(
+                        new ApduScript(
+                            input,
+                            null));
+                    }
 
                     retval.Add(
                         new ApduScript(
+                            true));
+
+                    lastPhrase = 1;
+                }
+                else if (line.Substring(0, 2).ToUpper() == "I:")
+                {
+                    // If user create apdu command without expected result
+                    if (lastPhrase == 2)
+                    {
+                        retval.Add(
+                        new ApduScript(
                             input,
-                            output));
+                            null));
+                    }
+
+                    // Record new apdu command
+                    input = line.Substring(2).Trim();
+
+                    lastPhrase = 2;
+                }
+                else if (line.Substring(0, 2).ToUpper() == "O:")
+                {
+                    if (lastPhrase == 2)
+                    {
+                        // Record new expected result
+                        output = line.Substring(2).Trim();
+
+                        retval.Add(
+                            new ApduScript(
+                                input,
+                                output)); 
+                    }
+
+                    lastPhrase = 4;
                 }
             }
 
@@ -155,7 +198,10 @@ namespace SimpleApduSender
 
                 if (script.IsReset)
                 {
+                    System.Threading.Thread.Sleep(1000);
+
                     string atr;
+
                     bool success = scWrapper.ResetReader(
                         (string)cboReader.SelectedItem,
                         out atr);
@@ -213,42 +259,19 @@ namespace SimpleApduSender
                         if (!isContinue)
                             break;
                     }
-                    else if (expOut != script.ExpectedOutput)
+                    else
                     {
-                        isContinue = DisplayErrorMessageYesNo(
-                            "Unexpected result. Do you wish to continue?");
+                        if (script.ExpectedOutput != null &&
+                            expOut != script.ExpectedOutput)
+                        {
+                            isContinue = DisplayErrorMessageYesNo(
+                                "Unexpected result. Do you wish to continue?");
 
-                        if (!isContinue)
-                            break;
+                            if (!isContinue)
+                                break; 
+                        }
                     } 
                 }
-            }
-        }
-
-        private void LoadFileToRichTextBox(
-            string FilePath,
-            RichTextBox rtb)
-        {
-            TextRange range;
-            FileStream fStream;
-
-            if (File.Exists(FilePath))
-            {
-                range = new TextRange(
-                    rtb.Document.ContentStart, 
-                    rtb.Document.ContentEnd);
-
-                fStream = new FileStream(
-                    FilePath, 
-                    FileMode.OpenOrCreate);
-
-                range.Load(fStream, DataFormats.Text);
-
-                fStream.Close();
-            }
-            else
-            {
-                DisplayErrorMessage("Unable to find " + FilePath);
             }
         }
 
@@ -285,10 +308,9 @@ namespace SimpleApduSender
                 string filename = dlg.FileName;
 
                 txtScriptPath.Text = filename;
-
-                LoadFileToRichTextBox(
-                    filename,
-                    rtbScript);
+                
+                // Load faster than using RichTextBox
+                txtScript.Text = File.ReadAllText(filename);
             }
         }
 

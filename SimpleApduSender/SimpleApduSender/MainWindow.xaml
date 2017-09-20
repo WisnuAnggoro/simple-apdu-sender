@@ -29,13 +29,7 @@
             <TextBox Margin="5" Name="txtScriptPath" IsReadOnly="True" />
         </DockPanel>
         <Image Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" Margin="5" Source="Assets/logocipta.png" IsEnabled="False" />
-        <RichTextBox Grid.Row="2" Grid.ColumnSpan="2" Margin="5" Name="rtbScript" FontFamily="Consolas" FontSize="14" VerticalScrollBarVisibility="Visible">
-            <RichTextBox.Resources>
-                <Style TargetType="{x:Type Paragraph}">
-                    <Setter Property="Margin" Value="0"/>
-                </Style>
-            </RichTextBox.Resources>
-        </RichTextBox>
+        <TextBox Grid.Row="2" Grid.ColumnSpan="2" Margin="5" Name="txtScript" VerticalScrollBarVisibility="Visible" TextWrapping="Wrap" AcceptsReturn="True" FontFamily="Consolas" />
         <Button Grid.Row="3" Grid.ColumnSpan="2" Margin="5" Height="27" Name="btnRunScript" Content="Run Script" Click="btnRunScript_Click" />
         <RichTextBox Grid.Row="4" Grid.ColumnSpan="2" Margin="5" Name="rtbOutput" FontFamily="Consolas" FontSize="14" VerticalScrollBarVisibility="Visible" IsReadOnly="True">
             <RichTextBox.Resources>
