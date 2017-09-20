@@ -13,6 +13,7 @@
             <RowDefinition Height="1*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="1*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition />
@@ -38,5 +39,6 @@
                 </Style>
             </RichTextBox.Resources>
         </RichTextBox>
+        <ProgressBar Grid.Row="5" Grid.ColumnSpan="2" Margin="5" Name="pbExecute" Height="15" />
     </Grid>
 </Window>

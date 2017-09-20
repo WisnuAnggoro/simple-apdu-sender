@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Documents;
 
 namespace SimpleApduSender
 {
@@ -13,6 +12,7 @@ namespace SimpleApduSender
     /// </summary>
     public partial class MainWindow : Window
     {
+        private BackgroundWorker worker;
         private SCardWrapper scWrapper;
 
         public MainWindow()
@@ -26,11 +26,14 @@ namespace SimpleApduSender
         private void DisplayErrorMessage(
             string message)
         {
-            MessageBox.Show(
+            Dispatcher.Invoke(new Action(() =>
+            {
+                MessageBox.Show(
                 message,
                 this.Title,
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
+            }));
         }
 
         private void DisplayLastErrorMessage()
@@ -42,11 +45,18 @@ namespace SimpleApduSender
         private bool DisplayErrorMessageYesNo(
             string message)
         {
-            return (MessageBox.Show(
-                message,
-                this.Title,
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Error) == MessageBoxResult.Yes);
+            MessageBoxResult msgResult = MessageBoxResult.No;
+
+            Dispatcher.Invoke(new Action(() =>
+            {
+                msgResult = MessageBox.Show(
+                    message,
+                    this.Title,
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Error);
+            }));
+
+            return msgResult == MessageBoxResult.Yes;
         }
 
         private void RefreshReaderList()
@@ -81,9 +91,14 @@ namespace SimpleApduSender
         {
             List<ApduScript> retval = new List<ApduScript>();
 
-            string[] lines = txtScript.Text.Split(
-                new string[] { Environment.NewLine }, 
-                StringSplitOptions.None);
+            string[] lines = null;
+
+            Dispatcher.Invoke(new Action(() =>
+            {
+                lines = txtScript.Text.Split(
+                    new string[] { Environment.NewLine },
+                    StringSplitOptions.None);
+            }));
 
             string input = String.Empty;
             string output = String.Empty;
@@ -183,33 +198,52 @@ namespace SimpleApduSender
             return retval;
         }
 
-        private void ExecuteScript()
+        private void ExecuteScript(object sender)
         {
             // Read script in the rich text box
             List<ApduScript> scriptList = ReadScript();
 
-            rtbOutput.Document.Blocks.Clear();
-            rtbOutput.AppendText("\n");
-            rtbOutput.AppendText("\n");
+            int counter = 0;
+            int scriptLength = scriptList.Count;
+
+            Dispatcher.Invoke(new Action(() =>
+            {
+                pbExecute.Minimum = 0;
+                pbExecute.Maximum = scriptLength;
+
+                rtbOutput.Document.Blocks.Clear();
+                rtbOutput.AppendText("\n");
+                rtbOutput.AppendText("\n");
+            }));
+
+            // Flag for completed execution
+            bool isContinue = true;
+
+            // Start counting the time
+            Stopwatch stopWatch = new Stopwatch();
+            stopWatch.Start();
 
             foreach (ApduScript script in scriptList)
             {
-                bool isContinue = true;
 
                 if (script.IsReset)
                 {
                     System.Threading.Thread.Sleep(1000);
 
-                    string atr;
+                    string atr = "";
+                    bool success = false;
 
-                    bool success = scWrapper.ResetReader(
+                    Dispatcher.Invoke(new Action(() =>
+                    {
+                        success = scWrapper.ResetReader(
                         (string)cboReader.SelectedItem,
                         out atr);
 
-                    rtbOutput.AppendText(
-                        String.Format(
-                            ">> RST(){0}",
-                            Environment.NewLine));
+                        rtbOutput.AppendText(
+                            String.Format(
+                                ">> RST(){0}",
+                                Environment.NewLine));
+                    }));
 
                     if (!success)
                     {
@@ -220,33 +254,39 @@ namespace SimpleApduSender
                             break;
                     }
 
-                    rtbOutput.AppendText(
+                    Dispatcher.Invoke(new Action(() =>
+                    {
+                        rtbOutput.AppendText(
                         String.Format(
                             "<< {0}{1}",
                             atr,
                             Environment.NewLine));
 
-                    rtbOutput.ScrollToEnd();
-                    rtbOutput.Refresh();
+                        rtbOutput.ScrollToEnd();
+                        rtbOutput.Refresh();
+                    }));
                 }
                 else
                 {
                     string expOut = scWrapper.SendAPDU(script.Input);
 
-                    rtbOutput.AppendText(
+                    Dispatcher.Invoke(new Action(() =>
+                    {
+                        rtbOutput.AppendText(
                         String.Format(
                             ">> {0}{1}",
                             script.Input,
                             Environment.NewLine));
 
-                    rtbOutput.AppendText(
-                        String.Format(
-                            "<< {0}{1}",
-                            expOut,
-                            Environment.NewLine));
+                        rtbOutput.AppendText(
+                            String.Format(
+                                "<< {0}{1}",
+                                expOut,
+                                Environment.NewLine));
 
-                    rtbOutput.ScrollToEnd();
-                    rtbOutput.Refresh();
+                        rtbOutput.ScrollToEnd();
+                        rtbOutput.Refresh();
+                    }));
 
                     if (expOut == String.Empty)
                     {
@@ -272,17 +312,105 @@ namespace SimpleApduSender
                         }
                     } 
                 }
+
+                (sender as BackgroundWorker).ReportProgress(++counter);
+            }
+
+            stopWatch.Stop();
+
+            // If isContinue is not touched (which means keep valued TRUE),
+            // the script is run completely and we need to know the elapsed time
+            if (isContinue)
+            {
+                // Get the elapsed time as a TimeSpan value.
+                TimeSpan ts = stopWatch.Elapsed;
+
+                Dispatcher.Invoke(new Action(() =>
+                {
+                    rtbOutput.AppendText(
+                        String.Format(
+                            "{0}Elapsed time: {1:00}:{2:00}:{3:00}.{4:00}",
+                            Environment.NewLine,
+                            ts.Hours, 
+                            ts.Minutes, 
+                            ts.Seconds,
+                            ts.Milliseconds / 10));
+
+                    rtbOutput.ScrollToEnd();
+                    rtbOutput.Refresh();
+                }));
             }
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            worker = new BackgroundWorker();
+            worker.WorkerReportsProgress = true;
+            worker.DoWork += Worker_DoWork;
+            worker.ProgressChanged += Worker_ProgressChanged;
+
             scWrapper = new SCardWrapper(
                 SCardScopes.System,
                 SCardShareModes.Shared,
                 SCardProtocol.Any);
 
             RefreshReaderList();
+        }
+
+        private void Worker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            RunScript(sender);
+        }
+
+        private void Worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            pbExecute.Value = e.ProgressPercentage;
+        }
+
+        private void RunScript(object sender)
+        {
+            try
+            {
+                // Establish Context
+                if (!scWrapper.EstablishContext())
+                {
+                    DisplayLastErrorMessage();
+                    return;
+                }
+
+                // Connect to selected reader
+                Dispatcher.Invoke(new Action(() =>
+                {
+
+                    if (!scWrapper.ConnectReader((string)cboReader.SelectedItem))
+                    {
+                        DisplayLastErrorMessage();
+                        return;
+                    }
+                }));
+
+                // Execute script
+                ExecuteScript(sender);
+
+                // Disconnect to selected reader
+                if (!scWrapper.DisconnectReader())
+                {
+                    DisplayLastErrorMessage();
+                    return;
+                }
+
+                // Release Context
+                if (!scWrapper.ReleaseContext())
+                {
+                    DisplayLastErrorMessage();
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                DisplayErrorMessage(
+                    ex.Message);
+            }
         }
 
         private void btnRefresh_Click(object sender, RoutedEventArgs e)
@@ -316,44 +444,7 @@ namespace SimpleApduSender
 
         private void btnRunScript_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                // Establish Context
-                if (!scWrapper.EstablishContext())
-                {
-                    DisplayLastErrorMessage();
-                    return;
-                }
-
-                // Connect to selected reader
-                if (!scWrapper.ConnectReader((string)cboReader.SelectedItem))
-                {
-                    DisplayLastErrorMessage();
-                    return;
-                }
-
-                // Execute script
-                ExecuteScript();
-
-                // Disconnect to selected reader
-                if (!scWrapper.DisconnectReader())
-                {
-                    DisplayLastErrorMessage();
-                    return;
-                }
-
-                // Release Context
-                if (!scWrapper.ReleaseContext())
-                {
-                    DisplayLastErrorMessage();
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                DisplayErrorMessage(
-                    ex.Message);
-            }
+            worker.RunWorkerAsync();
         }
     }
 
